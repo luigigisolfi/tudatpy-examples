@@ -487,7 +487,7 @@ for epoch in epochs_julian_seconds:
     time2plt.append(time_conversion.julian_day_to_calendar_date(epoch_days))
 
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
-
+ 
 ax1.plot(time2plt, laplace_stability_prop * 180 / math.pi, label='Propagated', c='#A50034')
 ax1.plot(time2plt, laplace_stability_ephem * 180 / math.pi, label='NOE 5 Ephemeris', c='#EC6842',
          linestyle=(0, (5, 10)))

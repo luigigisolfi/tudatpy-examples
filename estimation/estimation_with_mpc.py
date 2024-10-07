@@ -12,18 +12,6 @@ In the [DELFI-C3 - Parameter Estimation Example](https://docs.tudat.space/en/lat
 We will estimate the initial state of [Eros](https://en.wikipedia.org/wiki/433_Eros), a near-Earth asteroid also visited by the NEAR Shoemaker probe in 1998. We will use the `Tudat BatchMPC` interface to retrieve and process the data. For a more in depth explanation of this interface we recommend first checking out the [Retrieving observation data from the Minor Planet Centre](https://docs.tudat.space/en/latest/_src_getting_started/_src_examples/notebooks/estimation/retrieving_mpc_observation_data.html) example. We will also briefly use the SBDBquery class which interfaces JPL's [Small Body DataBase (SBDB)](https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html).
 """
 
-## Key API References
-"""
- Here's a comprehensive list of the  _modules_ and _methods_ that are relevant to this example, or that will be introduced here for the first time.
-
-| Module | | Methods |➡️ | | | | | | |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| [**data.mpc.BatchMPC**]() | [**get_observations**]() | [**filter**]() | [**summary**]() | [**observatories_table**]() | [**table.query**]() | [**MPC_objects**]() | [**to_tudat()**]()| [**epoch_start**]() | [**epoch_end**]() |
-| [**data.sbdb.SBDBquery**]() |[**codes_300_spkid**]() | [**shortname**]()|
-
-🧐 **Missing something**? You can find out more on the [TudatPy API Reference](https://py.api.tudat.space/en/latest/), or you can [reach out to us](https://docs.tudat.space/en/latest/_src_about/contribute_to_tudat.html)! 
-"""
-
 ## Import statements
 """
 Let's start with importing the required modules. Most - if not all - of them (spice, numerical_simulation, environment, propagation) are used quite extensively in pretty much all tudatpy examples.They will soon become your friends (if they haven't already!).
@@ -835,3 +823,6 @@ plt.show()
 # That's it for this tutorial! The final estimation result is quite close to spice at times, but there is clearly plenty of room for improvement in both the **dynamical model** and the **estimation settings**. Consider for example adding weights and biases on observations and links, as well as improved integrator settings and perturbations. 
 # 
 # If you wanna get more hands-on experience, consider rerunning the script for some other object by changing the `target_mpc_code` variable and seeing how the results change.
+
+
+

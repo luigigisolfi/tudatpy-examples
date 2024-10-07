@@ -19,10 +19,6 @@ The central_bodies argument gives the option specify the centre of propagation f
 In this script, this feature is used to implement a hierarchical propagation scheme.
 """
 
-## Key API References
-"""
-"""
-
 ## Import statements
 """
 The required import statements are made here, at the very beginning.

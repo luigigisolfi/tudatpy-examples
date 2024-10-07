@@ -20,18 +20,6 @@ The following asteroids will be used in the example:
 
 """
 
-## Key API References
-"""
- Here's a comprehensive list of the  _modules_ and _methods_ that are relevant to this example, or that will be introduced here for the first time.
-
-| Module | | Methods |➡️ | | | | | | | | |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---| ---|
-| [data.mpc.BatchMPC]() | [**get_observations**]() | [**filter**]() | [**summary**]() | [**observatories_table**]() | [**table.query**]() | [**MPC_objects**]() | [**to_tudat()**]()| [**epoch_start**]() | [**epoch_end**]() | [**plot_observations_sky**]() | [**plot_observations_temporal**]()|
-| data.horizons.HorizonsQuery | [**interpolated_observations**]() |
-
-🧐 **Missing something**? You can find out more on the [TudatPy API Reference](https://py.api.tudat.space/en/latest/), or you can [reach out to us](https://docs.tudat.space/en/latest/_src_about/contribute_to_tudat.html)! 
-"""
-
 ### Import statements
 """
 In this example we do not perform an estimation, so we only need the `BatchMPC`  class from `data` , `environment_setup`  and `observation`  to convert our observations to Tudat and optionally datetime to filter our batch. We will also use the **Tudat Horizons** interface to compare observation ouput and load the standard `SPICE` kernels.

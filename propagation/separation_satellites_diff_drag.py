@@ -11,10 +11,6 @@ It simulates the orbits of two LEO satellites separating via differential drag. 
 (5kg each), but one of them has 3x the drag surface area of the other, because of different attitudes.
 """
 
-## Key API References
-"""
-"""
-
 ## Import statements
 """
 The required import statements are made here, at the very beginning.

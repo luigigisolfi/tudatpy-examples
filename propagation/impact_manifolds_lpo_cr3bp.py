@@ -13,10 +13,6 @@ The invariant manifolds of a planar Lyapunov orbit around the L2 point of the Ma
 The different trajectories are propagated with respect to a Mars-centered inertially-oriented frame, but analyzed with respect to a Phobos-centered rotating (synodic) frame.
 """
 
-## Key API References
-"""
-"""
-
 ## Import statements
 """
 The required import statements are made here.
