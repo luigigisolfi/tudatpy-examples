@@ -73,6 +73,8 @@ Finally, the system of bodies is created using the settings. This system of bodi
 # Create default body settings for "Sun", "Earth", "Moon", "Mars", and "Venus"
 bodies_to_create = ["Sun", "Earth", "Moon", "Mars", "Venus"]
 
+print('Luigi')
+
 # Create default body settings for bodies_to_create, with "Earth"/"J2000" as the global frame origin and orientation
 global_frame_origin = "Earth"
 global_frame_orientation = "J2000"
