@@ -18,6 +18,7 @@ from tudatpy.math import interpolators
 from tudatpy.numerical_simulation import environment_setup, environment
 from tudatpy.numerical_simulation import estimation, estimation_setup
 from tudatpy.numerical_simulation.estimation_setup import observation
+from tudatpy.estimation import observable_models_setup, observations_setup, observations
 import random
 import matplotlib.dates as mdates
 from datetime import datetime
@@ -79,8 +80,8 @@ start = datetime(2013, 12, 28)
 end = datetime(2013, 12, 30)
 
 # Add a time buffer of one day to avoid interpolation issues
-start_time = time_conversion.datetime_to_tudat(start).epoch().to_float() - 86400.0
-end_time = time_conversion.datetime_to_tudat(end).epoch().to_float() + 86400.0
+start_time = time_conversion.datetime_to_tudat(start).epoch() - 86400.0
+end_time = time_conversion.datetime_to_tudat(end).epoch() + 86400.0
 
 # Create default body settings for celestial bodies and set origin and orientation of global frame
 bodies_to_create = ["Earth", "Sun", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Moon"]
@@ -94,12 +95,12 @@ body_settings = environment_setup.get_default_body_settings_time_limited(
 body_settings.get('Earth').shape_settings = environment_setup.shape.oblate_spherical_spice()
 body_settings.get('Earth').rotation_model_settings = environment_setup.rotation_model.gcrs_to_itrs(
     environment_setup.rotation_model.iau_2006, global_frame_orientation,
-    interpolators.interpolator_generation_settings_float(interpolators.cubic_spline_interpolation(),
-                                                         start_time, end_time, 3600.0),
-    interpolators.interpolator_generation_settings_float(interpolators.cubic_spline_interpolation(),
-                                                         start_time, end_time, 3600.0),
-    interpolators.interpolator_generation_settings_float(interpolators.cubic_spline_interpolation(),
-                                                         start_time, end_time, 60.0))
+    interpolators.interpolator_generation_settings(interpolators.cubic_spline_interpolation(),
+                                                   start_time, end_time, 3600.0),
+    interpolators.interpolator_generation_settings(interpolators.cubic_spline_interpolation(),
+                                                   start_time, end_time, 3600.0),
+    interpolators.interpolator_generation_settings(interpolators.cubic_spline_interpolation(),
+                                                   start_time, end_time, 60.0))
 body_settings.get('Earth').gravity_field_settings.associated_reference_frame = "ITRS"
 
 
@@ -152,8 +153,8 @@ ordered_ifms_list = ['M32ICL2L02_D2X_133621819_00.TAB',
                      'M32ICL2L02_D2X_133621904_00.TAB',
                      'M32ICL1L02_D2X_133630120_00.TAB',
                      'M32ICL1L02_D2X_133630203_00.TAB',
-                     'M63ODFXL02_DPX_133630348_00.TAB',
-                     'M14ODFXL02_DPX_133631130_00.TAB',
+                     #'M63ODFXL02_DPX_133630348_00.TAB',
+                     #'M14ODFXL02_DPX_133631130_00.TAB',
                      'M32ICL1L02_D2X_133631902_00.TAB',
                      'M32ICL1L02_D2X_133632221_00.TAB',
                      'M32ICL1L02_D2X_133632301_00.TAB']
@@ -193,7 +194,7 @@ for idx, ifms_file_list in enumerate([os.listdir(mex_ifms_folder), ordered_ifms_
     antenna_position_history = dict()
     com_position = [-1.3,0.0,0.0] # estimated based on the MEX_V16.TF file description
     times = compressed_observations.get_concatenated_observation_times()
-    times = [time.to_float() for time in times]
+    times = [time for time in times]
     mjd_times = [time_conversion.seconds_since_epoch_to_julian_day(t) for t in times]
     utc_times = np.array([Time(mjd_time, format='jd', scale='utc').datetime for mjd_time in mjd_times])
 
@@ -208,20 +209,21 @@ for idx, ifms_file_list in enumerate([os.listdir(mex_ifms_folder), ordered_ifms_
     light_time_correction_list.append(
         estimation_setup.observation.first_order_relativistic_light_time_correction(["Sun"]))
 
-    doppler_link_ends = compressed_observations.link_definitions_per_observable[
-        estimation_setup.observation.dsn_n_way_averaged_doppler]
+    doppler_link_ends = ifms_collection.link_definitions_per_observable[
+        observable_models_setup.model_settings.dsn_n_way_averaged_doppler_type
+    ]
 
     observation_model_settings = list()
     for current_link_definition in doppler_link_ends:
-        observation_model_settings.append(estimation_setup.observation.dsn_n_way_doppler_averaged(
+        observation_model_settings.append(observable_models_setup.model_settings.dsn_n_way_doppler_averaged(
             current_link_definition, light_time_correction_list, subtract_doppler_signature = False ))
 
     observation_simulators = estimation_setup.create_observation_simulators(observation_model_settings, bodies)
 
-    elevation_angle_settings = observation.elevation_angle_dependent_variable( observation.receiver )
-    elevation_angle_parser = compressed_observations.add_dependent_variable( elevation_angle_settings, bodies )
-    sep_angle_settings = observation.avoidance_angle_dependent_variable("Sun", observation.retransmitter, observation.receiver)
-    sep_angle_parser = compressed_observations.add_dependent_variable( sep_angle_settings, bodies )
+    #elevation_angle_settings = observation.elevation_angle_dependent_variable( observation.receiver )
+    #elevation_angle_parser = compressed_observations.add_dependent_variable( elevation_angle_settings, bodies )
+    #sep_angle_settings = observation.avoidance_angle_dependent_variable("Sun", observation.retransmitter, observation.receiver)
+    #sep_angle_parser = compressed_observations.add_dependent_variable( sep_angle_settings, bodies )
 
     estimation.compute_residuals_and_dependent_variables(compressed_observations, observation_simulators, bodies)
 
