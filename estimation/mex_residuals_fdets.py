@@ -5,7 +5,6 @@
 ##################################################################################################################
 import os
 import csv
-from xmlrpc.client import DateTime
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.colors as mcolors
@@ -13,16 +12,13 @@ import random
 
 # Load required tudatpy modules
 from tudatpy.interface import spice
-from tudatpy import numerical_simulation
-from tudatpy.astro import time_conversion, element_conversion
+from tudatpy.astro.time_representation import DateTime
 from tudatpy.math import interpolators
-from tudatpy.numerical_simulation import environment_setup, environment
-from tudatpy.numerical_simulation import estimation, estimation_setup
-from tudatpy.numerical_simulation.estimation_setup import observation
-from datetime import datetime, timezone
+from tudatpy.dynamics import environment_setup, environment
+from tudatpy import estimation
+from tudatpy.estimation import observable_models_setup, observations_setup
+from datetime import datetime
 from astropy.time import Time
-from collections import defaultdict
-import matplotlib.dates as mdates
 import tudatpy.data as data
 def ID_to_site(site_ID):
     """
@@ -89,8 +85,8 @@ def get_filtered_fdets_collection(
         fdets_file,
         ifms_files,
         receiving_station_name,
-        reception_band = observation.FrequencyBands.x_band,
-        transmission_band = observation.FrequencyBands.x_band,
+        reception_band = observations_setup.ancillary_settings.FrequencyBands.x_band,
+        transmission_band = observations_setup.ancillary_settings.FrequencyBands.x_band,
         base_frequency = 8412e6,
         column_types = ["utc_datetime_string", "signal_to_noise_ratio", "normalised_spectral_max","doppler_measured_frequency_hz", "doppler_noise_hz"],
         target_name = 'MEX'
@@ -136,26 +132,24 @@ def get_filtered_fdets_collection(
             transmitting_station_name = 'NWNORCIA'
 
         # Loading IFMS file
-        ifms_collection = observation.observations_from_ifms_files(
+        ifms_collection = observations_setup.observations_wrapper.observations_from_ifms_files(
             [ifms_file], bodies, spacecraft_name, transmitting_station_name, reception_band, transmission_band
         )
 
 
         ifms_collections_list.append(ifms_collection)
         ifms_times = ifms_collection.get_observation_times()
-        ifms_times = [time.to_float() for time in ifms_times[0]]
-
-        start_ifms_time = min(ifms_times)
-        end_ifms_time = max(ifms_times)
+        start_ifms_time = np.min(ifms_times)
+        end_ifms_time = np.min(ifms_times)
 
 
-        start_mjd_time = time_conversion.seconds_since_epoch_to_julian_day(start_ifms_time)
-        end_mjd_time = time_conversion.seconds_since_epoch_to_julian_day(end_ifms_time)
+        start_jd_time = DateTime.from_epoch(start_ifms_time).to_julian_day()
+        end_jd_time = DateTime.from_epoch(end_ifms_time).to_julian_day()
 
-        start_utc_time = Time(start_mjd_time, format='jd', scale='utc').datetime
-        end_utc_time = Time(end_mjd_time, format='jd', scale='utc').datetime
+        start_utc_time = Time(start_jd_time, format='jd', scale='utc').datetime
+        end_utc_time = Time(end_jd_time, format='jd', scale='utc').datetime
 
-        fdets_collection = observation.observations_from_fdets_files(
+        fdets_collection = observations_setup.observations_wrapper.observations_from_fdets_files(
             fdets_file, base_frequency, column_types, target_name,
             transmitting_station_name, receiving_station_name, reception_band, transmission_band
         )
@@ -197,8 +191,8 @@ if __name__ == "__main__":
     end = datetime(2013, 12, 29)
 
     # Add a time buffer of one day
-    start_time = time_conversion.datetime_to_tudat(start).epoch().to_float() - 86400.0
-    end_time = time_conversion.datetime_to_tudat(end).epoch().to_float() + 86400.0
+    start_time = DateTime.from_python_datetime(start).to_epoch() - 86400.0
+    end_time = DateTime.from_python_datetime(end).to_epoch() + 86400.0
 
     # Create default body settings for celestial bodies
     bodies_to_create = ["Earth", "Sun", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Moon"]
@@ -211,11 +205,11 @@ if __name__ == "__main__":
     body_settings.get('Earth').shape_settings = environment_setup.shape.oblate_spherical_spice()
     body_settings.get('Earth').rotation_model_settings = environment_setup.rotation_model.gcrs_to_itrs(
         environment_setup.rotation_model.iau_2006, global_frame_orientation,
-        interpolators.interpolator_generation_settings_float(interpolators.cubic_spline_interpolation(),
+        interpolators.interpolator_generation_settings(interpolators.cubic_spline_interpolation(),
                                                              start_time, end_time, 3600.0),
-        interpolators.interpolator_generation_settings_float(interpolators.cubic_spline_interpolation(),
+        interpolators.interpolator_generation_settings(interpolators.cubic_spline_interpolation(),
                                                              start_time, end_time, 3600.0),
-        interpolators.interpolator_generation_settings_float(interpolators.cubic_spline_interpolation(),
+        interpolators.interpolator_generation_settings(interpolators.cubic_spline_interpolation(),
                                                              start_time, end_time, 60.0))
 
     body_settings.get('Earth').gravity_field_settings.associated_reference_frame = "ITRS"
@@ -232,11 +226,11 @@ if __name__ == "__main__":
 
     # Create System of Bodies using the above-defined body_settings
     bodies = environment_setup.create_system_of_bodies(body_settings)
-    observation.set_vmf_troposphere_data(
+    observable_models_setup.light_time_corrections.set_vmf_troposphere_data(
         [ "/Users/lgisolfi/Desktop/mex_phobos_flyby/VMF/y2013.vmf3_r.txt" ], True, False, bodies, False, True )
     # Meteorological (tropospsheric) uplink and downlink corrections
     weather_files = ([os.path.join('/Users/lgisolfi/Desktop/data_archiving-1.0/dataset/mex/gr035/downloaded/met', met_file) for met_file in os.listdir('/Users/lgisolfi/Desktop/data_archiving-1.0/dataset/mex/gr035/downloaded/met')])
-    body_settings.get("Earth").ground_station_settings.append(data.set_estrack_weather_data_in_ground_stations(bodies,weather_files, 'NWNORCIA'))
+    #body_settings.get("Earth").ground_station_settings.append(data.set_estrack_weather_data_in_ground_stations(bodies,weather_files, 'NWNORCIA'))
 ########## IMPORTANT STEP ###################################
     # Set the transponder turnaround ratio function
     vehicleSys = environment.VehicleSystems()
@@ -246,8 +240,8 @@ if __name__ == "__main__":
 
     base_frequency = 8412e6
     column_types = ["utc_datetime_string", "signal_to_noise_ratio", "normalised_spectral_max","doppler_measured_frequency_hz", "doppler_noise_hz"]
-    reception_band = observation.FrequencyBands.x_band
-    transmission_band = observation.FrequencyBands.x_band
+    reception_band = observations_setup.ancillary_settings.FrequencyBands.x_band
+    transmission_band = observations_setup.ancillary_settings.FrequencyBands.x_band
 
     sites_list = []
     fdets_files = []
@@ -283,8 +277,7 @@ if __name__ == "__main__":
                 print(f'Transmitting station: {transmitting_station_name}')
 
                 times = filtered_collection.get_observation_times()
-                times = [time.to_float() for time in times[0]]
-                mjd_times = [time_conversion.seconds_since_epoch_to_julian_day(t) for t in times]
+                mjd_times = [DateTime.to_julian_day(t) for t in times]
                 utc_times = np.array([Time(mjd_time, format='jd', scale='utc').datetime for mjd_time in mjd_times])
 
                 com_position = [-1.3,0.0,0.0] # estimated based on the MEX_V16.TF file description
@@ -349,6 +342,7 @@ if __name__ == "__main__":
 
 # Output files creation
 for site_name, data in fdets_station_residuals.items():
+    print('h')
     fdets_residuals_path = '/Users/lgisolfi/Desktop/mex_phobos_flyby/output/fdets_residuals'
     os.makedirs(fdets_residuals_path, exist_ok=True)
     filename = f"{site_name}_residuals.csv"

@@ -13,6 +13,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
+
+
 # %% [markdown]
 # ## 2. Helper Functions
 # %%
@@ -82,7 +84,6 @@ new_ground_stations_settings = [environment_setup.ground_station.basic_station(
 body_settings.get('Earth').ground_station_settings = environment_setup.ground_station.radio_telescope_stations() + new_ground_stations_settings
 
 bodies = environment_setup.create_system_of_bodies(body_settings)
-body_fixed_station_position = bodies.get('Earth').get_ground_station(receiving_station_name).station_state.get_cartesian_position(0)
 
 # Transponder and Frequencies
 vehicleSys = environment.VehicleSystems()
@@ -125,8 +126,18 @@ time_shift = 0.84
 fdets_clean = strip_and_shift_first_column(fdets_original, "/Users/lgisolfi/Desktop/PRIDE_DATA_NEW/LEGA_shifted/", time_shift_seconds= time_shift)
 
 column_types = ["utc_datetime_string", "signal_to_noise_ratio", "normalised_spectral_max", "doppler_measured_frequency_hz", "doppler_noise_hz"]
-station_positions = {'Yg': body_fixed_station_position}
+station_positions = {
+    'Yg': bodies.get('Earth').get_ground_station('Yg').station_state.get_cartesian_position(start_time),
+    'NWNORCIA': bodies.get('Earth').get_ground_station('NWNORCIA').station_state.get_cartesian_position(start_time)
+}
 
+fdets_collection = observations_setup.observations_wrapper.observations_from_fdets_files(
+    fdets_clean, base_frequency,
+    ["utc_datetime_string", "signal_to_noise_ratio", "normalised_spectral_max", "doppler_measured_frequency_hz", "doppler_noise_hz"],
+    "JUICE", 'NWNORCIA', 'Yg',
+    observations_setup.ancillary_settings.FrequencyBands.x_band,
+    observations_setup.ancillary_settings.FrequencyBands.x_band, station_positions
+)
 print(f"Loading shifted FDETS observations ({time_shift} s)...")
 fdets_collection = observations_setup.observations_wrapper.observations_from_fdets_files(
     fdets_clean, base_frequency, column_types, "JUICE", 'NWNORCIA', 'Yg',

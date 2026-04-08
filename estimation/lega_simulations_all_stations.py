@@ -15,7 +15,9 @@ from tudatpy.dynamics import environment_setup, environment
 from tudatpy.estimation import observable_models_setup, observations_setup
 from tudatpy import estimation
 from tudatpy.math import interpolators
-import constants #
+import constants
+from tudatpy.estimation import observations, observations_setup
+
 
 # %% 1. Configuration & Paths
 fdets_folder = "/Users/lgisolfi/Desktop/PRIDE_DATA_NEW/LEGA/"
@@ -24,7 +26,7 @@ output_folder = "/Users/lgisolfi/Desktop/PRIDE_DATA_NEW/LEGA_shifted/"
 time_shift = 0
 
 # Find all matching files
-fdets_files = glob.glob(os.path.join(fdets_folder, "Fdets.jui2024.08.20.*.r2i.txt"))
+fdets_files = glob.glob(os.path.join(fdets_folder, "Fdets.jui2024.08.19.Cd.r*i.txt"))
 
 # %% 2. Helper Functions
 def extract_base_frequency(file_path):
@@ -74,11 +76,14 @@ for f_path in fdets_files:
     spice.load_standard_kernels()
     spice.load_kernel("juice_archive/spk/juice_orbc_000097_230414_310721_v02.bsp")
 
-    start = datetime(2024, 8, 19); end = datetime(2024, 8, 21)
+    start = datetime(2024, 8, 19, 10,58,36)
+    end = datetime(2024, 8, 20, 19, 28, 9)
     start_time = DateTime.from_python_datetime(start).to_epoch()
     end_time = DateTime.from_python_datetime(end).to_epoch()
     start_time_buffer = start_time - 86400; end_time_buffer = end_time + 86400
 
+    occultation_start = DateTime.from_python_datetime(datetime(2024, 8, 19,20,30)).to_epoch()
+    occultation_end = DateTime.from_python_datetime(datetime(2024, 8, 19,21,14)).to_epoch()
 
     body_settings = environment_setup.get_default_body_settings_time_limited(
         ["Earth", "Sun", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Moon"],
@@ -92,7 +97,7 @@ for f_path in fdets_files:
     spacecraft_name = "JUICE"; spacecraft_central_body = "Jupiter"
     body_settings.add_empty_settings(spacecraft_name)
     body_settings.get(spacecraft_name).ephemeris_settings = environment_setup.ephemeris.interpolated_spice(
-        start_time_buffer, end_time_buffer, 10.0, spacecraft_central_body, global_frame_orientation)
+        start_time_buffer, end_time_buffer, 1.0, spacecraft_central_body, global_frame_orientation)
     body_settings.get(spacecraft_name).rotation_model_settings = environment_setup.rotation_model.spice(
         global_frame_orientation, spacecraft_name + "_SPACECRAFT", "")
 
@@ -112,10 +117,6 @@ for f_path in fdets_files:
         interpolators.interpolator_generation_settings(interpolators.cubic_spline_interpolation(), start_time_buffer, end_time_buffer, 3600.0),
         interpolators.interpolator_generation_settings(interpolators.cubic_spline_interpolation(), start_time_buffer, end_time_buffer, 10.0))
 
-    body_settings.add_empty_settings("JUICE")
-    body_settings.get("JUICE").ephemeris_settings = environment_setup.ephemeris.interpolated_spice(
-        start_time_buffer, end_time_buffer, 10.0, "Jupiter", "J2000")
-
     bodies = environment_setup.create_system_of_bodies(body_settings)
 
     vehicleSys = environment.VehicleSystems()
@@ -124,8 +125,8 @@ for f_path in fdets_files:
 
     # Norcia Ramp
     station_ramp = environment.PiecewiseLinearFrequencyInterpolator(
-        [DateTime(2024,8,19, 10,58,36).epoch(), DateTime(2024,8,20, 11,32,17).epoch()],
-        [DateTime(2024,8,19, 22,10,22).epoch(), DateTime(2024,8,20, 19,28,9).epoch()],
+        [DateTime(2024,8,19, 10,45,36).epoch(), DateTime(2024,8,20, 10,32,17).epoch()],
+        [DateTime(2024,8,20, 22,10,22).epoch(), DateTime(2024,8,20, 19,55,9).epoch()],
         [0, 0], [7180.142419e6, 7180.127320e6]
     )
     bodies.get('Earth').get_ground_station('NWNORCIA').transmitting_frequency_calculator = station_ramp
@@ -162,22 +163,50 @@ for f_path in fdets_files:
         [observable_models_setup.model_settings.doppler_measured_frequency(link_definition, light_time_correction_list)], bodies)
     estimation.observations.compute_residuals_and_dependent_variables(fdets_collection, simulators, bodies)
 
+    pre_occultation_filter = observations.observations_processing.observation_filter(
+        observations.observations_processing.ObservationFilterType.time_bounds_filtering,
+        start_time,
+        occultation_start,
+        use_opposite_condition=True,
+    )
+
+    post_occultation_filter = observations.observations_processing.observation_filter(
+        observations.observations_processing.ObservationFilterType.time_bounds_filtering,
+        occultation_end,
+        end_time,
+        use_opposite_condition=True,
+    )
+
     # %% 5. Visualization
+
+    fdets_collection.filter_observations(pre_occultation_filter)
     times_tdb = fdets_collection.get_concatenated_observation_times()
     residuals = fdets_collection.get_concatenated_residuals()
+    observations_val = fdets_collection.get_concatenated_observations()
+    simulated_val = observations_val - residuals
     residuals_detrended = signal.detrend(residuals)
 
     converter = time_representation.default_time_scale_converter()
     times_datetime = np.array([DateTime.to_python_datetime(DateTime.from_epoch(
         converter.convert_time(time_representation.tdb_scale, time_representation.utc_scale, t))) for t in times_tdb])
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.scatter(times_datetime, residuals, color='gray', s=1, alpha=0.3, label='Original')
+
+    fig, (ax2, ax) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+
+    ax.scatter(times_datetime, residuals, color='gray', s=5, alpha=0.3, label='Original')
     ax.scatter(times_datetime, residuals_detrended, color='green', s=2, label='Detrended')
     ax.axhline(0, color='black', linewidth=1)
     ax.set_title(f'JUICE Residuals: {station_id} ({site_full_name}) @ {current_base_freq/1e6:.2f} MHz')
-    ax.set_ylabel('Residual [Hz]'); ax.set_xlabel('Time (UTC)')
+    ax.set_ylabel('Residual [Hz]')
     ax.legend(title=f"Original RMS: {np.sqrt(np.mean(residuals**2)):.4f} Hz\nDetrended RMS: {np.sqrt(np.mean(residuals_detrended**2)):.4f} Hz")
+
+    ax2.plot(times_datetime, observations_val, label='Observed', color='blue', alpha=0.5)
+    ax2.plot(times_datetime, simulated_val, label='Simulated', color='red', linestyle='--')
+    ax2.set_ylabel('Frequency [Hz]'); ax2.set_xlabel('Time (UTC)')
+    ax2.legend()
+
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
+    ax.grid(True, alpha=0.3)
+    ax2.grid(True, alpha=0.3)
+
+    plt.savefig("/Users/lgisolfi/Desktop/PRIDE_DATA_NEW/LEGA/plots/" + station_id + ".png")
     plt.show()
