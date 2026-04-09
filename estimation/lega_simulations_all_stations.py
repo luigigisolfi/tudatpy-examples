@@ -26,7 +26,7 @@ output_folder = "/Users/lgisolfi/Desktop/PRIDE_DATA_NEW/LEGA_shifted/"
 time_shift = 0
 
 # Find all matching files
-fdets_files = glob.glob(os.path.join(fdets_folder, "Fdets.jui2024.08.19.Cd.r*i.txt"))
+fdets_files = glob.glob(os.path.join(fdets_folder, "Fdets.jui2024.08.19.Hh.r*i.txt"))
 
 # %% 2. Helper Functions
 def extract_base_frequency(file_path):
@@ -84,6 +84,8 @@ for f_path in fdets_files:
 
     occultation_start = DateTime.from_python_datetime(datetime(2024, 8, 19,20,30)).to_epoch()
     occultation_end = DateTime.from_python_datetime(datetime(2024, 8, 19,21,14)).to_epoch()
+    hh_jump_time = DateTime.from_python_datetime(datetime(2024, 8, 19,19,31)).to_epoch()
+
 
     body_settings = environment_setup.get_default_body_settings_time_limited(
         ["Earth", "Sun", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Moon"],
@@ -125,8 +127,8 @@ for f_path in fdets_files:
 
     # Norcia Ramp
     station_ramp = environment.PiecewiseLinearFrequencyInterpolator(
-        [DateTime(2024,8,19, 10,45,36).epoch(), DateTime(2024,8,20, 10,32,17).epoch()],
-        [DateTime(2024,8,20, 22,10,22).epoch(), DateTime(2024,8,20, 19,55,9).epoch()],
+        [DateTime(2024,8,19, 10,45,36).epoch(), DateTime(2024,8,20, 11,32,17).epoch()],
+        [DateTime(2024,8,20, 11,32,17).epoch(), DateTime(2024,8,22, 20,55,9).epoch()],
         [0, 0], [7180.142419e6, 7180.127320e6]
     )
     bodies.get('Earth').get_ground_station('NWNORCIA').transmitting_frequency_calculator = station_ramp
@@ -178,35 +180,128 @@ for f_path in fdets_files:
     )
 
     # %% 5. Visualization
-
     fdets_collection.filter_observations(pre_occultation_filter)
     times_tdb = fdets_collection.get_concatenated_observation_times()
     residuals = fdets_collection.get_concatenated_residuals()
     observations_val = fdets_collection.get_concatenated_observations()
     simulated_val = observations_val - residuals
-    residuals_detrended = signal.detrend(residuals)
 
+    # Detrend segments separately to account for different slopes/curvatures
     converter = time_representation.default_time_scale_converter()
+    times_tdb_array = np.asarray(
+        fdets_collection.get_concatenated_observation_times()
+    )
+
+    hh_jump_time_tdb = converter.convert_time(
+        time_representation.utc_scale,
+        time_representation.tdb_scale,
+        hh_jump_time
+    )
+
+    split_idx = np.where(times_tdb_array > hh_jump_time_tdb)[0]
+
+    breakpoint = split_idx[0] if len(split_idx) > 0 else []
+    residuals_detrended = signal.detrend(residuals, bp=breakpoint)
+
     times_datetime = np.array([DateTime.to_python_datetime(DateTime.from_epoch(
         converter.convert_time(time_representation.tdb_scale, time_representation.utc_scale, t))) for t in times_tdb])
 
-    fig, (ax2, ax) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
 
-    ax.scatter(times_datetime, residuals, color='gray', s=5, alpha=0.3, label='Original')
-    ax.scatter(times_datetime, residuals_detrended, color='green', s=2, label='Detrended')
-    ax.axhline(0, color='black', linewidth=1)
-    ax.set_title(f'JUICE Residuals: {station_id} ({site_full_name}) @ {current_base_freq/1e6:.2f} MHz')
-    ax.set_ylabel('Residual [Hz]')
-    ax.legend(title=f"Original RMS: {np.sqrt(np.mean(residuals**2)):.4f} Hz\nDetrended RMS: {np.sqrt(np.mean(residuals_detrended**2)):.4f} Hz")
+    plt.style.use('seaborn-v0_8-whitegrid')
 
-    ax2.plot(times_datetime, observations_val, label='Observed', color='blue', alpha=0.5)
-    ax2.plot(times_datetime, simulated_val, label='Simulated', color='red', linestyle='--')
-    ax2.set_ylabel('Frequency [Hz]'); ax2.set_xlabel('Time (UTC)')
-    ax2.legend()
+    # Time conversion
+    converter = time_representation.default_time_scale_converter()
+    times_datetime = np.array([
+        DateTime.to_python_datetime(
+            DateTime.from_epoch(
+                converter.convert_time(
+                    time_representation.tdb_scale,
+                    time_representation.utc_scale,
+                    t
+                )
+            )
+        )
+        for t in times_tdb
+    ])
 
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-    ax.grid(True, alpha=0.3)
-    ax2.grid(True, alpha=0.3)
+    # Colors (consistent palette)
+    color_obs = '#4C72B0'
+    color_sim = '#DD8452'
+    color_res = '#55A868'
+    color_raw = '#999999'
 
-    plt.savefig("/Users/lgisolfi/Desktop/PRIDE_DATA_NEW/LEGA/plots/" + station_id + ".png")
+    # Figure and axes
+    fig, (ax_top, ax_bottom) = plt.subplots(
+        2, 1, figsize=(12, 8), sharex=True,
+        gridspec_kw={'height_ratios': [1, 1]}
+    )
+
+    plt.subplots_adjust(hspace=0.08)
+
+    # --- TOP: Observed vs Simulated ---
+    ax_top.plot(times_datetime, observations_val,
+                label='Observed', color=color_obs, linewidth=2)
+
+    ax_top.plot(times_datetime, simulated_val,
+                label='Simulated', color=color_sim,
+                linestyle='--', linewidth=2)
+
+    ax_top.set_ylabel('Frequency [Hz]')
+    ax_top.legend(loc='lower right')
+
+    # --- BOTTOM: Residuals ---
+    ax_bottom.scatter(times_datetime, residuals,
+                      color=color_raw, s=7, alpha=0.8, label='Original')
+
+    ax_bottom.scatter(times_datetime, residuals_detrended,
+                      s = 7,
+                   color=color_res, label='Detrended')
+
+    ax_bottom.axhline(0, color='black', linestyle='--', linewidth=1, alpha=0.7)
+
+    ax_bottom.set_ylabel('Residual [Hz]')
+    ax_bottom.set_xlabel('Time (UTC)')
+
+    # RMS annotation (cleaner than legend)
+    rms_text = (
+        f"RMS (Original): {np.sqrt(np.mean(residuals**2)):.4f} Hz\n"
+        f"RMS (Detrended): {np.sqrt(np.mean(residuals_detrended**2)):.4f} Hz"
+    )
+
+    ax_bottom.text(
+        0.01, 0.95, rms_text,
+        transform=ax_bottom.transAxes,
+        fontsize=10,
+        verticalalignment='top',
+        bbox=dict(boxstyle='round', facecolor='white', alpha=0.7)
+    )
+
+    ax_bottom.legend(loc='upper right')
+
+    # --- Time axis formatting ---
+    ax_bottom.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+    ax_bottom.xaxis.set_major_locator(mdates.MinuteLocator(interval=30))
+    ax_bottom.xaxis.set_minor_locator(mdates.MinuteLocator(interval=10))
+
+    # --- Clean look ---
+    for ax in [ax_top, ax_bottom]:
+        ax.grid(True, alpha=0.3)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+    # --- Title ---
+    fig.suptitle(
+        f"JUICE Doppler Residuals\n"
+        f"{station_id} ({site_full_name}) — {current_base_freq/1e6:.2f} MHz",
+        fontsize=15,
+        y=0.98
+    )
+
+    # --- Save ---
+    plt.savefig(
+        f"/Users/lgisolfi/Desktop/PRIDE_DATA_NEW/LEGA/plots/{station_id}.png",
+        dpi=300,
+        bbox_inches='tight'
+    )
+
     plt.show()
