@@ -79,6 +79,7 @@ timestep_global = 20 * 3600.0
 # 1 month time buffer used to avoid interpolation errors:
 time_buffer = 1 * 31 * 86400.0
 
+
 # define the frame origin and orientation.
 global_frame_origin = "SSB"
 global_frame_orientation = "J2000"
@@ -111,9 +112,6 @@ batch.filter(
     epoch_end=observations_end,
 )
 
-batch.summary()
-
-
 """
 Other than **Earth-based telescopes**, our batch also includes observations from **space telescopes**.
 Let's check that out. 
@@ -131,13 +129,12 @@ As we can see, observations by WISE, TESS and Yangwang, as well as some non-geoc
 
 obs_by_WISE = (
     batch.table.query("observatory == 'C51'")
-    .loc[:, ["number", "epochUTC", "RA", "DEC"]]
+    .loc[:, ["number", "epoch_seconds_UTC", "RA", "DEC"]]
     .iloc[[0, -1]]
 )
 
 print("\nInitial and Final Observations by WISE:")
 print(obs_by_WISE)
-
 
 """
 While the observations from space telescopes appear to be useful, including them requires setting up the dynamics for the spacecraft, which is too advanced for this tutorial. Space-based observations will therefore be excluded later on in this example. 
@@ -286,7 +283,6 @@ For the integrator we use the fixed timestep RKF-7(8) setting our initial time t
 
 # Create numerical integrator settings
 integrator_settings = propagation_setup.integrator.runge_kutta_variable_step_size(
-    epoch_start_buffer,
     timestep_global,
     propagation_setup.integrator.CoefficientSets.rkf_78,
     timestep_global,
